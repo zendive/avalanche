@@ -1,7 +1,10 @@
-.PHONY: test run
+.PHONY: test run build
 
 test:
 	go test -v ./lib
 
+build: test
+	go build .
+
 run:
-	go run .
+	time go run .

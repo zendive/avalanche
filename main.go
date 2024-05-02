@@ -1,12 +1,12 @@
 package main
 
 import (
+	"crypto/tls"
 	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
 	"runtime"
-	"runtime/pprof"
 	"sync"
 	"sync/atomic"
 	"syscall"
@@ -16,7 +16,7 @@ import (
 )
 
 var testUrl string = "http://localhost:8282/"
-var testStartTime = time.Now()
+var testStartTime = time.Now().UTC()
 var meanResponse = lib.NewAverageble(lib.AveragebleOptions{Population: true})
 var meanFetchesPerSec = lib.NewAverageble(lib.AveragebleOptions{Population: true})
 var meanSuccess = lib.NewAverageble(lib.AveragebleOptions{Population: true})
@@ -24,23 +24,24 @@ var fetchesNum uint64 = 0
 var successNum uint64 = 0
 var mutex = &sync.Mutex{}
 var responseStatusCount = make(map[interface{}]int64)
-var secElapsed = time.Duration(0)
-var MAX_RUNTIME = time.Duration(10) * time.Minute
+var MAX_RUNTIME_DURATION = time.Duration(1) * time.Minute
 
 func main() {
 	runtime.GOMAXPROCS(runtime.NumCPU())
 
-	fmt.Printf("Commencing avalanche fetch on: %s\n", testUrl)
+	if len(os.Args) > 1 && os.Args[1] != "" {
+		testUrl = os.Args[1]
+	}
+
+	fmt.Printf("Version: %s, CPUs: %d\n", runtime.Version(), runtime.NumCPU())
 	fmt.Println("Press Ctrl+C to stop...")
 
 	ticker := time.NewTicker(time.Duration(1) * time.Second)
-	chanSysSignals := make(chan os.Signal, 2)
-	signal.Notify(chanSysSignals, os.Interrupt, syscall.SIGTERM)
+	chanSysSignals := make(chan os.Signal, 1)
+	signal.Notify(chanSysSignals, syscall.SIGINT, syscall.SIGTERM, os.Interrupt)
 
-	// whait for Ctrl+C
 	go func() {
 		<-chanSysSignals
-		pprof.StopCPUProfile()
 		ticker.Stop()
 		printStats()
 		os.Exit(0)
@@ -49,25 +50,37 @@ func main() {
 	// each tick: update fps
 	go func() {
 		for range ticker.C {
-			fmt.Print(successNum, " ")
+			fmt.Printf("%d ", successNum)
 			meanFetchesPerSec.Add(float64(fetchesNum))
 			meanSuccess.Add(float64(successNum))
 			atomic.AddUint64(&fetchesNum, -fetchesNum)
 			atomic.AddUint64(&successNum, -successNum)
 
-			secElapsed += time.Duration(1) * time.Second
-			if secElapsed >= MAX_RUNTIME {
-				chanSysSignals <- syscall.SIGTERM
+			elapsed := time.Now().UTC().Sub(testStartTime)
+			if elapsed >= MAX_RUNTIME_DURATION {
+				chanSysSignals <- syscall.SIGINT
 			}
 		}
 	}()
 
-	client := http.Client{}
+	customTransport := http.DefaultTransport.(*http.Transport).Clone()
+	customTransport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
+	client := http.Client{Transport: customTransport}
 
-	// start fetching
+asyncFetching:
 	for i := 0; ; i++ {
-		url := fmt.Sprintf("%s?avalanche=%d", testUrl, i)
-		go fetchUrl(&url, &client)
+		select {
+		// whait for Ctrl+C
+		case <-chanSysSignals:
+			break asyncFetching
+
+		default:
+			url := fmt.Sprintf("%s?avalanche=%d", testUrl, i)
+			go fetchUrl(&url, &client)
+			// shortening sleep duration generates more errors on tested server,
+			// but also suffocate current process
+			time.Sleep(time.Millisecond)
+		}
 	}
 }
 
@@ -78,7 +91,6 @@ func fetchUrl(url *string, client *http.Client) {
 	response, err := client.Get(*url)
 
 	if err != nil {
-		//fmt.Println(err)
 		mutex.Lock()
 		responseStatusCount["total"] += 1
 		responseStatusCount["error"] += 1
@@ -99,7 +111,7 @@ func fetchUrl(url *string, client *http.Client) {
 
 func printStats() {
 	mutex.Lock()
-	fmt.Printf("\nTest complete in:\t%v for url: %s\n", time.Since(testStartTime), testUrl)
+	fmt.Printf("\nTest complete in:\t%.1f(s) for url: %s\n", time.Since(testStartTime).Seconds(), testUrl)
 	fmt.Printf("Successfull (rps):\t%v\n", meanSuccess)
 	fmt.Printf("Response time (s):\t%v\n", meanResponse)
 	fmt.Printf("Fetch rate (fps):\t%v\n", meanFetchesPerSec)
