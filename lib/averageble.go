@@ -56,6 +56,6 @@ func (avg *Averageble) Add(value float64) {
 }
 
 func (avg *Averageble) String() string {
-	return fmt.Sprintf("min=%v, avg=%v, max=%v, stddev=%v",
-		avg.Min, avg.Mean, avg.Max, avg.StdDev)
+	return fmt.Sprintf("avg=%v, min=%v, max=%v, stddev=%v",
+		avg.Mean, avg.Min, avg.Max, avg.StdDev)
 }

@@ -1,16 +1,19 @@
 # avalanche
+
 Perform stress load test on specific URL in avalanche-fetching manner
 
-##### Usecase
- * Explore boundaries
-    * trigger errors like ```Error: ENFILE: file table overflow```
-    * memory usage
- * Measure response per second (rps) of specific URL
- * Testing recoverability after denial of service simulation
+##### Motivation
+
+- Explore server boundaries with maximum requests
+  - trigger errors like `Error: ENFILE: file table overflow`
+  - memory usage
+- Measure response per second (rps) of specific URL
+- Testing recoverability after denial of service simulation
 
 ##### Example
+
 ```bash
-$ go run main.go
+$ make run
 Commencing avalanche fetch on: http://localhost:8282/
 Press Ctrl+C to stop...
 27 40 0 0 229 42 56 57 126 34 17 101 0 81 44 0 126 51 0 81 124 0 122 22 84 33 29 ^C
@@ -22,10 +25,15 @@ Fetch rate (fps):       min=6580, avg=56119.14814814815, max=87586, stddev=17952
 ---
 ```
 
-##### Test
+##### Requirements
+
+- Go: 1.22.2
+
 ```bash
-go test ./lib
+make run
+make test
 ```
 
 ##### Links
- * <https://golang.org>
+
+- <https://go.dev/>

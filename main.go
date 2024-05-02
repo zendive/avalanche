@@ -1,5 +1,3 @@
-// stress load, HTTP avalanche-fetching
-
 package main
 
 import (
@@ -13,8 +11,9 @@ import (
 	"sync/atomic"
 	"syscall"
 	"time"
+
+	"github.com/zendive/avalanche/lib"
 )
-import lib "./lib"
 
 var testUrl string = "http://localhost:8282/"
 var testStartTime = time.Now()
@@ -88,7 +87,7 @@ func fetchUrl(url *string, client *http.Client) {
 		defer response.Body.Close()
 
 		mutex.Lock()
-		if 200 == response.StatusCode {
+		if http.StatusOK == response.StatusCode {
 			atomic.AddUint64(&successNum, 1)
 		}
 		responseStatusCount["total"] += 1
