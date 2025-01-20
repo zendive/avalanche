@@ -31,6 +31,11 @@ Fetch rate (fps):       avg=818.533,    min=778.000,    max=838.000,    stddev=1
 
 - Go: 1.22.2
 
+##### Install
+```bash
+go install github.com/zendive/avalanche@latest
+```
+
 ##### Links
 
 - <https://go.dev/>
